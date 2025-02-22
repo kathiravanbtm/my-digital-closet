@@ -1,11 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
-export default function ProfileScreen() {
+export default function WardrobeScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Profile</Text>
-      <Text style={styles.subtitle}>Manage your account settings.</Text>
+      <Text style={styles.title}>Your Wardrobe</Text>
+      <Text style={styles.subtitle}>Manage your clothing items here.</Text>
     </View>
   );
 }

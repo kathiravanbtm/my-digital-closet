@@ -1,12 +1,12 @@
-// src/screens/ClosetScreen.js
+// src/screens/LaundryScreen.js
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 
-export default function ClosetScreen() {
+export default function LaundryScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Closet Screen</Text>
-      {/* Display list of all saved clothing items or categories */}
+      <Text style={styles.title}>Laundry Screen</Text>
+      {/* Display items that are marked as 'sent to laundry' */}
     </View>
   );
 }
