@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   View,
   Text,
-  FlatList,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
@@ -108,31 +107,27 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Day Selector (Right Side) */}
+      {/* Day Selector (Fixed at Right Side Center) */}
       <View style={styles.daySelector}>
-        <FlatList
-          data={days}
-          keyExtractor={(item) => item}
-          contentContainerStyle={styles.dayList}
-          renderItem={({ item }) => (
-            <TouchableOpacity
+        {days.map((day, index) => (
+          <TouchableOpacity
+            key={index}
+            style={[
+              styles.dayButton,
+              selectedDay === day && styles.selectedDay,
+            ]}
+            onPress={() => setSelectedDay(day)}
+          >
+            <Text
               style={[
-                styles.dayButton,
-                selectedDay === item && styles.selectedDay,
+                styles.dayText,
+                selectedDay === day && styles.selectedDayText,
               ]}
-              onPress={() => setSelectedDay(item)}
             >
-              <Text
-                style={[
-                  styles.dayText,
-                  selectedDay === item && styles.selectedDayText,
-                ]}
-              >
-                {item.substring(0, 3)}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
+              {day.substring(0, 3)}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </View>
   );
@@ -192,11 +187,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 15,
-  },
-  dayList: {
-    justifyContent: "center",
-    alignItems: "center",
-    height: screenHeight * 0.7, // Center the list vertically
   },
   dayButton: {
     width: 90,
