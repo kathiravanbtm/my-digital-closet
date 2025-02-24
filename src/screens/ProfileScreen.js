@@ -25,6 +25,17 @@ export default function LaundryScreen() {
     await AsyncStorage.setItem("laundry", JSON.stringify(updatedLaundry));
   };
 
+  const moveToLaundry = async (item) => {
+    // Assuming you have a function to handle moving items to laundry
+    // This function should remove the item from the wardrobe and add it to laundry
+    // For example:
+    // await addToLaundry(item);
+    // await removeFromWardrobe(item.id);
+    
+    // After moving, refresh the laundry list
+    loadLaundry();
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Laundry</Text>
@@ -34,7 +45,9 @@ export default function LaundryScreen() {
         keyExtractor={(item) => item.id.toString()}
         numColumns={2}
         contentContainerStyle={styles.laundryGrid}
-        renderItem={({ item }) => <ClothingItem item={item} onDelete={deleteLaundryItem} />}
+        renderItem={({ item }) => (
+          <ClothingItem item={item} onDelete={deleteLaundryItem} onMoveToLaundry={moveToLaundry} />
+        )}
       />
     </View>
   );

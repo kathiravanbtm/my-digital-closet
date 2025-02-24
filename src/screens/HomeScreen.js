@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  Image, 
-  ScrollView, 
-  Modal, 
-  StyleSheet, 
-  Dimensions 
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  ScrollView,
+  Modal,
+  StyleSheet,
+  Dimensions,
+  FlatList
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
@@ -15,45 +16,33 @@ import { useFocusEffect } from '@react-navigation/native';
 const screenWidth = Dimensions.get("window").width;
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-// Example outfit generation function (adjust as needed)
 const generateOutfits = (items, outfitType) => {
   const available = items.filter(item => !item.laundryStatus && item.wearCount > 0);
-  const styleFiltered = available.filter(item => item.properties && item.properties.dressStyle === outfitType);
-  
-  if (outfitType === "formal") {
-    const tops = styleFiltered.filter(item => item.category.toLowerCase() === 'top');
-    const inners = styleFiltered.filter(item => item.category.toLowerCase() === 'inner');
-    const bottoms = styleFiltered.filter(item => item.category.toLowerCase() === 'bottom');
-    const baniyans = styleFiltered.filter(item => item.category.toLowerCase() === 'baniyan');
-    const socks = styleFiltered.filter(item => item.category.toLowerCase() === 'socks');
-    
-    let outfits = {};
-    days.forEach((day, index) => {
-      outfits[day] = {
-        top: tops.length ? tops[index % tops.length] : null,
-        inner: inners.length ? inners[index % inners.length] : null,
-        bottom: bottoms.length ? bottoms[index % bottoms.length] : null,
-        baniyan: baniyans.length ? baniyans[index % baniyans.length] : null,
-        socks: socks.length ? socks[index % socks.length] : null,
-      };
-    });
-    return outfits;
-  } else {
-    // For casual outfits, you might only use top, bottom, and shorts (or trouser)
-    const tops = styleFiltered.filter(item => item.category.toLowerCase() === 'top');
-    const bottoms = styleFiltered.filter(item => item.category.toLowerCase() === 'bottom');
-    const shorts = styleFiltered.filter(item => item.category.toLowerCase() === 'shorts' || item.category.toLowerCase() === 'trouser');
-    
-    let outfits = {};
-    days.forEach((day, index) => {
-      outfits[day] = {
-        top: tops.length ? tops[index % tops.length] : null,
-        bottom: bottoms.length ? bottoms[index % bottoms.length] : null,
-        shorts: shorts.length ? shorts[index % shorts.length] : null,
-      };
-    });
-    return outfits;
-  }
+  const styleFiltered = available.filter(item => item.properties?.dressStyle === outfitType);
+
+  const categories = {
+    top: styleFiltered.filter(item => item.category === 'top'),
+    bottom: styleFiltered.filter(item => item.category === 'bottom'),
+    inner: styleFiltered.filter(item => item.category === 'inner'),
+    baniyan: styleFiltered.filter(item => item.category === 'baniyan'),
+    socks: styleFiltered.filter(item => item.category === 'socks'),
+    shorts: styleFiltered.filter(item => item.category === 'shorts')
+  };
+
+  const getRandomItem = (arr) => arr.length > 0 ? arr[Math.floor(Math.random() * arr.length)] : null;
+
+  let outfits = {};
+  days.forEach(day => {
+    outfits[day] = {
+      top: getRandomItem(categories.top),
+      bottom: getRandomItem(categories.bottom),
+      inner: outfitType === 'formal' ? getRandomItem(categories.inner) : null,
+      baniyan: outfitType === 'formal' ? getRandomItem(categories.baniyan) : null,
+      socks: outfitType === 'formal' ? getRandomItem(categories.socks) : null,
+      shorts: outfitType === 'casual' ? getRandomItem(categories.shorts) : null,
+    };
+  });
+  return outfits;
 };
 
 export default function HomeScreen({ navigation }) {
@@ -64,8 +53,9 @@ export default function HomeScreen({ navigation }) {
   const [popupImageUri, setPopupImageUri] = useState(null);
   const [popupPart, setPopupPart] = useState(null);
   const [showPopup, setShowPopup] = useState(false);
+  const [laundryItems, setLaundryItems] = useState([]);
+  const [showLaundryPopup, setShowLaundryPopup] = useState(false);
 
-  // Reload wardrobe whenever the screen is focused
   useFocusEffect(
     useCallback(() => {
       loadCloset();
@@ -78,24 +68,41 @@ export default function HomeScreen({ navigation }) {
       if (data) {
         const items = JSON.parse(data);
         setCloset(items);
-        const outfits = generateOutfits(items, outfitType);
-        setGeneratedOutfits(outfits);
+        setGeneratedOutfits(generateOutfits(items, outfitType));
       }
     } catch (error) {
       console.error("Error loading closet:", error);
     }
   };
 
-  const onGenerateOutfits = () => {
-    loadCloset();
+  const handleMoveToLaundry = () => {
+    const currentOutfit = generatedOutfits[selectedDay];
+    const items = Object.values(currentOutfit).filter(item => item);
+    setLaundryItems(items);
+    setShowLaundryPopup(true);
   };
 
-  const onMoveToLaundry = () => {
-    console.log("Move to Laundry pressed");
+  const handleLaundryAction = (item, action) => {
+    const updatedCloset = closet.map(closetItem => {
+      if (closetItem.id === item.id) {
+        if (action === 'move') {
+          closetItem.laundryStatus = true;
+          closetItem.wearCount = Math.max(0, closetItem.wearCount - 1);
+        } else if (action === 'restore') {
+          closetItem.laundryStatus = false;
+        }
+      }
+      return closetItem;
+    });
+    
+    AsyncStorage.setItem('wardrobe', JSON.stringify(updatedCloset))
+      .then(() => {
+        loadCloset();
+        setShowLaundryPopup(false);
+      });
   };
 
-  // Popup modal handler
-  const openPopup = (uri, part) => {
+  const openImagePopup = (uri, part) => {
     if (uri) {
       setPopupImageUri(uri);
       setPopupPart(part);
@@ -103,140 +110,188 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  const replaceDress = (part) => {
-    console.log(`Replace dress for: ${part}`);
+  const replaceClothingItem = (part) => {
+    // Implement replacement logic here
+    console.log(`Replacing ${part}`);
     setShowPopup(false);
   };
 
-  const currentOutfit = generatedOutfits[selectedDay];
+  const currentOutfit = generatedOutfits[selectedDay] || {};
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Your Wardrobe</Text>
+      <Text style={styles.title}>Smart Wardrobe</Text>
 
-      {/* Outfit Preview and Day Selector */}
-      <View style={styles.previewAndDayContainer}>
-        {/* Left: Outfit Preview */}
-        <View style={styles.outfitContainer}>
-          <Text style={styles.outfitTitle}>Outfit for {selectedDay}</Text>
-          {currentOutfit ? (
-            <View style={styles.outfitPreviewContainer}>
-              {/* Left Column: Accessory Boxes */}
-              <View style={styles.accessoryContainer}>
-                {outfitType === "formal" ? (
-                  <>
-                    <TouchableOpacity style={styles.accessoryBox} onPress={() => openPopup(currentOutfit.inner?.image, "inner")}>
-                      {currentOutfit.inner ? (
-                        <Image source={{ uri: currentOutfit.inner.image }} style={styles.accessoryImage} />
-                      ) : (
-                        <Text style={styles.outfitText}>Blank</Text>
-                      )}
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.accessoryBox} onPress={() => openPopup(currentOutfit.baniyan?.image, "baniyan")}>
-                      {currentOutfit.baniyan ? (
-                        <Image source={{ uri: currentOutfit.baniyan.image }} style={styles.accessoryImage} />
-                      ) : (
-                        <Text style={styles.outfitText}>Blank</Text>
-                      )}
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.accessoryBox} onPress={() => openPopup(currentOutfit.socks?.image, "socks")}>
-                      {currentOutfit.socks ? (
-                        <Image source={{ uri: currentOutfit.socks.image }} style={styles.accessoryImage} />
-                      ) : (
-                        <Text style={styles.outfitText}>Blank</Text>
-                      )}
-                    </TouchableOpacity>
-                  </>
+      <View style={styles.mainContent}>
+        {/* Outfit Preview Section */}
+        <View style={styles.outfitSection}>
+          <Text style={styles.sectionTitle}>{selectedDay}'s Outfit</Text>
+          
+          <View style={styles.outfitGrid}>
+            {/* Main Clothing Items */}
+            <View style={styles.mainItems}>
+              <TouchableOpacity 
+                style={styles.clothingBoxLarge}
+                onPress={() => openImagePopup(currentOutfit.top?.image, 'top')}
+              >
+                {currentOutfit.top ? (
+                  <Image source={{ uri: currentOutfit.top.image }} style={styles.clothingImage} />
                 ) : (
-                  <TouchableOpacity style={styles.accessoryBox} onPress={() => openPopup(currentOutfit.shorts?.image, "shorts")}>
-                    {currentOutfit.shorts ? (
-                      <Image source={{ uri: currentOutfit.shorts.image }} style={styles.accessoryImage} />
-                    ) : (
-                      <Text style={styles.outfitText}>Blank</Text>
-                    )}
-                  </TouchableOpacity>
+                  <Text style={styles.placeholderText}>Top</Text>
                 )}
-              </View>
-              {/* Right Column: Main Outfit Boxes (Centered) */}
-              <View style={styles.mainContainer}>
-                <TouchableOpacity style={styles.outfitBox} onPress={() => openPopup(currentOutfit.top?.image, "top")}>
-                  {currentOutfit.top ? (
-                    <Image source={{ uri: currentOutfit.top.image }} style={styles.outfitBoxImage} />
-                  ) : (
-                    <Text style={styles.outfitText}>No Top</Text>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.outfitBox} onPress={() => openPopup(currentOutfit.bottom?.image, "bottom")}>
-                  {currentOutfit.bottom ? (
-                    <Image source={{ uri: currentOutfit.bottom.image }} style={styles.outfitBoxImage} />
-                  ) : (
-                    <Text style={styles.outfitText}>No Bottom</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.clothingBoxLarge}
+                onPress={() => openImagePopup(currentOutfit.bottom?.image, 'bottom')}
+              >
+                {currentOutfit.bottom ? (
+                  <Image source={{ uri: currentOutfit.bottom.image }} style={styles.clothingImage} />
+                ) : (
+                  <Text style={styles.placeholderText}>Bottom</Text>
+                )}
+              </TouchableOpacity>
             </View>
-          ) : (
-            <Text style={styles.outfitText}>No outfit generated yet.</Text>
-          )}
-          <View style={styles.toggleRow}>
-            <TouchableOpacity
-              style={[styles.toggleButton, outfitType === "formal" && styles.activeButton]}
-              onPress={() => { setOutfitType("formal"); loadCloset(); }}
-            >
-              <Text style={styles.buttonText}>Formal</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleButton, outfitType === "casual" && styles.activeButton]}
-              onPress={() => { setOutfitType("casual"); loadCloset(); }}
-            >
-              <Text style={styles.buttonText}>Casual</Text>
-            </TouchableOpacity>
+
+            {/* Accessories Column */}
+            <View style={styles.accessoriesColumn}>
+              {['inner', 'baniyan', 'socks'].map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={styles.accessoryBox}
+                  onPress={() => openImagePopup(currentOutfit[type]?.image, type)}
+                >
+                  {currentOutfit[type] ? (
+                    <Image source={{ uri: currentOutfit[type].image }} style={styles.accessoryImage} />
+                  ) : (
+                    <Text style={styles.placeholderText}>{type.charAt(0).toUpperCase() + type.slice(1)}</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Outfit Type Toggle */}
+          <View style={styles.toggleContainer}>
+            {['formal', 'casual'].map((type) => (
+              <TouchableOpacity
+                key={type}
+                style={[
+                  styles.toggleButton,
+                  outfitType === type && styles.activeToggle
+                ]}
+                onPress={() => setOutfitType(type)}
+              >
+                <Text style={styles.toggleText}>{type.charAt(0).toUpperCase() + type.slice(1)}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
-        {/* Right: Day Selector */}
-        <View style={styles.daySelectorContainer}>
-          <ScrollView contentContainerStyle={styles.dayScroll} showsVerticalScrollIndicator={false}>
-            {days.map((day, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[styles.dayButton, selectedDay === day && styles.selectedDay]}
-                onPress={() => setSelectedDay(day)}
-              >
-                <Text style={[styles.dayText, selectedDay === day && styles.selectedDayText]}>
-                  {day.substring(0, 3)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+        {/* Day Selection */}
+        <ScrollView 
+          horizontal
+          contentContainerStyle={styles.daysContainer}
+          showsHorizontalScrollIndicator={false}
+        >
+          {days.map(day => (
+            <TouchableOpacity
+              key={day}
+              style={[
+                styles.dayButton,
+                selectedDay === day && styles.selectedDay
+              ]}
+              onPress={() => setSelectedDay(day)}
+            >
+              <Text style={[
+                styles.dayText,
+                selectedDay === day && styles.selectedDayText
+              ]}>
+                {day.slice(0, 3)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
-      {/* Generate Outfits Button */}
-      <TouchableOpacity style={styles.generateButton} onPress={onGenerateOutfits}>
-        <Text style={styles.generateButtonText}>Generate Outfits</Text>
-      </TouchableOpacity>
+      {/* Action Buttons */}
+      <View style={styles.actionButtons}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.laundryButton]}
+          onPress={handleMoveToLaundry}
+        >
+          <Text style={styles.buttonText}>Laundry</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.generateButton]}
+          onPress={loadCloset}
+        >
+          <Text style={styles.buttonText}>Refresh</Text>
+        </TouchableOpacity>
+      </View>
 
-      {/* Move to Laundry Button */}
-      <TouchableOpacity style={styles.laundryButton} onPress={onMoveToLaundry}>
-        <Text style={styles.generateButtonText}>Move to Laundry</Text>
-      </TouchableOpacity>
-
-      {/* Popup Modal for Enlarged Image */}
-      <Modal transparent visible={showPopup} animationType="fade">
-        <TouchableOpacity style={styles.popupOverlay} onPress={() => setShowPopup(false)}>
-          {popupImageUri && (
-            <View style={styles.popupContent}>
-              <Image source={{ uri: popupImageUri }} style={styles.popupImage} />
-              <TouchableOpacity style={styles.replaceButton} onPress={() => replaceDress(popupPart)}>
-                <Text style={styles.replaceButtonText}>Replace</Text>
+      {/* Image Preview Modal */}
+      <Modal visible={showPopup} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.imageModal}>
+            <Image source={{ uri: popupImageUri }} style={styles.enlargedImage} />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.replaceButton]}
+                onPress={() => replaceClothingItem(popupPart)}
+              >
+                <Text style={styles.buttonText}>Replace</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.closeButton} onPress={() => setShowPopup(false)}>
-                <Text style={styles.closeButtonText}>Close</Text>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.closeButton]}
+                onPress={() => setShowPopup(false)}
+              >
+                <Text style={styles.buttonText}>Close</Text>
               </TouchableOpacity>
             </View>
-          )}
-        </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Laundry Modal */}
+      <Modal visible={showLaundryPopup} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.laundryModal}>
+            <Text style={styles.modalTitle}>Laundry Management</Text>
+            
+            <FlatList
+              data={laundryItems}
+              keyExtractor={item => item.id.toString()}
+              renderItem={({ item }) => (
+                <View style={styles.laundryItem}>
+                  <Image source={{ uri: item.image }} style={styles.laundryImage} />
+                  <View style={styles.laundryActions}>
+                    <TouchableOpacity 
+                      style={[styles.laundryActionButton, styles.restoreButton]}
+                      onPress={() => handleLaundryAction(item, 'restore')}
+                    >
+                      <Text style={styles.buttonText}>Keep</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.laundryActionButton, styles.confirmLaundryButton]}
+                      onPress={() => handleLaundryAction(item, 'move')}
+                    >
+                      <Text style={styles.buttonText}>Wash</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            />
+            
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.closeButton]}
+              onPress={() => setShowLaundryPopup(false)}
+            >
+              <Text style={styles.buttonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -245,187 +300,212 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: '#f5f5f5',
     padding: 20,
   },
   title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 20,
-    textAlign: "center",
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#2d3436',
+    textAlign: 'center',
+    marginVertical: 15,
   },
-  previewAndDayContainer: {
-    flexDirection: "row",
+  mainContent: {
     flex: 1,
-  },
-  outfitContainer: {
-    flex: 3,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 10,
-  },
-  outfitTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 15,
-    color: "#374151",
-  },
-  outfitText: {
-    fontSize: 16,
-    color: "#4B5563",
-  },
-  outfitPreviewContainer: {
-    flexDirection: "row",
-    alignItems: "center",
     marginBottom: 20,
   },
-  accessoryContainer: {
-    width: 60,
-    justifyContent: "space-around",
-    alignItems: "flex-start",
+  outfitSection: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 15,
+    marginBottom: 20,
+    elevation: 3,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#2d3436',
+    marginBottom: 15,
+  },
+  outfitGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  mainItems: {
+    flex: 2,
+    marginRight: 10,
+  },
+  clothingBoxLarge: {
+    height: 150,
+    backgroundColor: '#dfe6e9',
+    borderRadius: 15,
+    marginVertical: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  accessoriesColumn: {
+    flex: 1,
+    justifyContent: 'space-between',
   },
   accessoryBox: {
-    width: 50,
-    height: 50,
-    borderRadius: 5,
-    backgroundColor: "#ccc",
+    height: 70,
+    backgroundColor: '#dfe6e9',
+    borderRadius: 10,
     marginVertical: 3,
-    alignItems: "center",
-    justifyContent: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  clothingImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 15,
   },
   accessoryImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "contain",
-  },
-  mainContainer: {
-    flex: 1,
-    alignItems: "center",
-  },
-  outfitBox: {
-    width: 100,
-    height: 100,
-    borderRadius: 10,
-    backgroundColor: "#eee",
-    marginVertical: 5,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  outfitBoxImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "contain",
-  },
-  daySelectorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 15,
-  },
-  dayScroll: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  dayButton: {
-    width: 90,
-    height: 50,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#E5E7EB",
-    marginVertical: 6,
+    width: '100%',
+    height: '100%',
     borderRadius: 10,
   },
-  dayText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#374151",
+  placeholderText: {
+    color: '#636e72',
+    fontSize: 14,
   },
-  selectedDay: {
-    backgroundColor: "#6200EE",
-  },
-  selectedDayText: {
-    color: "#fff",
-  },
-  toggleRow: {
-    flexDirection: "row",
-    marginTop: 15,
+  toggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 10,
   },
   toggleButton: {
-    paddingVertical: 12,
+    paddingHorizontal: 25,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginHorizontal: 5,
+    backgroundColor: '#dfe6e9',
+  },
+  activeToggle: {
+    backgroundColor: '#0984e3',
+  },
+  toggleText: {
+    color: '#2d3436',
+    fontWeight: '500',
+  },
+  daysContainer: {
+    paddingVertical: 10,
+  },
+  dayButton: {
     paddingHorizontal: 20,
-    borderRadius: 25,
-    backgroundColor: "#D1D5DB",
+    paddingVertical: 10,
+    borderRadius: 15,
+    backgroundColor: '#dfe6e9',
     marginHorizontal: 5,
   },
-  activeButton: {
-    backgroundColor: "#6200EE",
+  selectedDay: {
+    backgroundColor: '#0984e3',
   },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
+  dayText: {
+    color: '#2d3436',
+    fontWeight: '500',
   },
-  generateButton: {
-    position: "absolute",
-    bottom: 20,
-    right: 20,
-    backgroundColor: "#10B981",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
+  selectedDayText: {
+    color: 'white',
   },
-  generateButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  laundryButton: {
-    position: "absolute",
-    bottom: 20,
-    left: 20,
-    backgroundColor: "#DC2626",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-  },
-  popupOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.8)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  popupContent: {
-    alignItems: "center",
-  },
-  popupImage: {
-    width: "60%",
-    height: "60%",
-    resizeMode: "contain",
-    marginBottom: 20,
-  },
-  replaceButton: {
-    backgroundColor: "#FFC107",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 10,
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 10,
   },
-  replaceButtonText: {
-    color: "#000",
-    fontWeight: "bold",
+  actionButton: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  laundryButton: {
+    backgroundColor: '#d63031',
+  },
+  generateButton: {
+    backgroundColor: '#00b894',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
     fontSize: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageModal: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 20,
+    width: '90%',
+  },
+  enlargedImage: {
+    width: '100%',
+    height: 300,
+    borderRadius: 15,
+    marginBottom: 15,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 25,
+    borderRadius: 15,
+  },
+  replaceButton: {
+    backgroundColor: '#fdcb6e',
   },
   closeButton: {
-    backgroundColor: "#6200EE",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 10,
+    backgroundColor: '#636e72',
   },
-  closeButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
+  laundryModal: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  laundryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#dfe6e9',
+  },
+  laundryImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 10,
+    marginRight: 15,
+  },
+  laundryActions: {
+    flexDirection: 'row',
+    marginLeft: 'auto',
+  },
+  laundryActionButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 10,
+    marginLeft: 10,
+  },
+  restoreButton: {
+    backgroundColor: '#00b894',
+  },
+  confirmLaundryButton: {
+    backgroundColor: '#d63031',
   },
 });
