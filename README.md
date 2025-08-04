@@ -44,7 +44,7 @@ This project was developed for the **FOSS Hackathon**, focusing on a seamless us
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/kathiravanbtm/digital-closet.git
+   git clone https://github.com/kathiravanbtm/my-digital-closet.git
    cd digital-closet
    ```
 

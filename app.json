@@ -1,17 +1,19 @@
 {
-  "expo": {    
-    "name": "my-digital-closet",
+  "expo": {
+    "name": "My Digital Closet",
     "slug": "my-digital-closet",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true
     },
@@ -22,7 +24,17 @@
       }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you share clothing images.",
+          "cameraPermission": "The app accesses your camera to let you take clothing photos."
+        }
+      ]
+    ]
   }
 }
